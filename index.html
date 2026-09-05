@@ -1,7 +1,13 @@
+ <!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Application Runway</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
   /* ---------- Material 3 tokens ---------- */
@@ -62,31 +68,6 @@
       --status-withdrawn: #c4c6d0;  --status-withdrawn-c: #43474e;  --status-withdrawn-on: #e8eaed;
     }
   }
-  :root[data-theme="dark"]{
-    --bg: #111318;
-    --surface: #1a1c20;
-    --surface-1: #1f222a;
-    --surface-2: #262a33;
-    --surface-high: #2d323d;
-    --outline: #8e9099;
-    --outline-variant: #43474e;
-    --text: #e3e2e6;
-    --text-dim: #c4c6d0;
-
-    --primary: #a8c7fa;
-    --on-primary: #0a3985;
-    --primary-container: #0842a0;
-    --on-primary-container: #d3e3fd;
-
-    --inverse-surface: #e3e2e6;
-    --inverse-on-surface: #2f3033;
-
-    --status-applied: #a8c7fa;    --status-applied-c: #0a3985;    --status-applied-on: #d3e3fd;
-    --status-interview: #fdd663;  --status-interview-c: #574500;  --status-interview-on: #ffe8b3;
-    --status-offer: #81c995;      --status-offer-c: #0b4d20;      --status-offer-on: #c4eed0;
-    --status-rejected: #f2b8b5;   --status-rejected-c: #7d2b24;   --status-rejected-on: #f9dedc;
-    --status-withdrawn: #c4c6d0;  --status-withdrawn-c: #43474e;  --status-withdrawn-on: #e8eaed;
-  }
 
   *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html,body{ margin:0; padding:0; }
@@ -102,6 +83,7 @@
   @media (prefers-reduced-motion: reduce){
     *{ animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
   }
+  [hidden]{ display:none !important; }
 
   .wrap{ max-width: 1080px; margin: 0 auto; padding: 0 24px; }
 
@@ -113,14 +95,29 @@
   }
   @keyframes rip{ to{ transform: scale(1); opacity: 0; } }
 
-  /* state layer on hover for interactive surfaces */
-  .statey{ position:relative; }
-  .statey::before{
-    content:""; position:absolute; inset:0; background: currentColor; opacity:0;
-    transition: opacity 0.1s; pointer-events:none;
+  /* ---------- auth screen ---------- */
+  .authwrap{
+    min-height: 100vh; display:flex; align-items:center; justify-content:center; padding: 24px;
   }
-  .statey:hover::before{ opacity: 0.06; }
-  .statey:focus-visible::before{ opacity: 0.10; }
+  .authcard{
+    background: var(--surface); border-radius: 28px; box-shadow: var(--e2);
+    max-width: 380px; width:100%; padding: 40px 32px; text-align:center;
+  }
+  .authcard h1{ font-weight:400; font-size: 26px; margin: 0 0 8px; }
+  .authcard p{ color: var(--text-dim); font-size: 14px; margin: 0 0 28px; }
+  .gbtn{
+    display:flex; align-items:center; justify-content:center; gap: 10px;
+    width: 100%; padding: 11px 16px; border-radius: 999px;
+    background: #ffffff; border: 1px solid #747775; color: #1f1f1f;
+    font-family: "Roboto", sans-serif; font-weight: 500; font-size: 14px; cursor: pointer;
+  }
+  .gbtn:hover{ box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+  .authnote{ margin-top: 22px; font-size: 12px; color: var(--text-dim); }
+  .autherr{
+    margin-top: 16px; font-size: 13px; color: var(--status-rejected-on);
+    background: var(--status-rejected-c); border-radius: 8px; padding: 10px 12px; display:none;
+  }
+  .autherr.show{ display:block; }
 
   /* ---------- top app bar ---------- */
   header.top{
@@ -136,15 +133,20 @@
   .brand p{
     margin: 3px 0 0; color: var(--text-dim); font-size: 13px; font-weight: 400;
   }
-  .save-indicator{
-    font-size: 12.5px; color: var(--text-dim); font-weight: 500;
-    display:flex; align-items:center; gap:7px;
-    white-space: nowrap;
-    background: var(--surface-2); border-radius: 999px; padding: 7px 14px 7px 10px;
+  .userchip{
+    display:flex; align-items:center; gap:10px;
   }
-  .save-dot{ width:8px; height:8px; border-radius:50%; background: var(--status-offer); flex: none; }
-  .save-dot.busy{ background: var(--status-interview); }
-  .save-dot.err{ background: var(--status-rejected); }
+  .avatar{
+    width: 32px; height: 32px; border-radius: 50%; background: var(--primary-container);
+    color: var(--on-primary-container); display:flex; align-items:center; justify-content:center;
+    font-size: 13px; font-weight: 600; flex: none; object-fit: cover;
+  }
+  .userchip .email{ font-size: 12.5px; color: var(--text-dim); max-width: 160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .signout{
+    font-family: inherit; font-size: 12.5px; font-weight: 500; color: var(--primary);
+    background: transparent; border: none; cursor: pointer; padding: 6px 8px; border-radius: 8px;
+  }
+  .signout:hover{ background: var(--surface-2); }
 
   .banner{
     background: var(--status-interview-c); color: var(--status-interview-on);
@@ -336,45 +338,71 @@
     .grid2{ grid-template-columns: 1fr; }
   }
 </style>
+</head>
+<body>
 
-<header class="top">
-  <div class="brand">
+<!-- ---------- auth screen ---------- -->
+<div class="authwrap" id="authScreen">
+  <div class="authcard">
     <h1>Application Runway</h1>
-    <p>Every application, tracked in one place.</p>
+    <p>Sign in to track your job applications — your board is private to your account and synced everywhere you log in.</p>
+    <button class="gbtn" id="googleBtn">
+      <svg width="18" height="18" viewBox="0 0 18 18">
+        <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
+        <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/>
+        <path fill="#FBBC05" d="M3.964 10.707c-.18-.54-.282-1.117-.282-1.707s.102-1.167.282-1.707V4.961H.957C.347 6.175 0 7.55 0 9s.348 2.825.957 4.039l3.007-2.332z"/>
+        <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.961L3.964 6.293C4.672 4.166 6.656 3.58 9 3.58z"/>
+      </svg>
+      Sign in with Google
+    </button>
+    <div class="autherr" id="authErr"></div>
+    <p class="authnote">Only you can see or edit your applications.</p>
   </div>
-  <div class="save-indicator" id="saveIndicator">
-    <span class="save-dot" id="saveDot"></span>
-    <span id="saveText">Ready</span>
-  </div>
-</header>
-
-<div class="wrap">
-  <div class="banner" id="banner"></div>
-
-  <div class="board" id="board"></div>
-
-  <div class="toolbar">
-    <div class="search">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input id="searchInput" type="text" placeholder="Search company or role">
-    </div>
-    <div class="chips" id="statusChips"></div>
-    <select class="sort" id="sortSelect">
-      <option value="date_desc">Newest first</option>
-      <option value="date_asc">Oldest first</option>
-      <option value="company">Company A–Z</option>
-      <option value="status">By status</option>
-    </select>
-  </div>
-
-  <div class="list" id="list"></div>
-
-  <footer id="footerNote">Data is saved to this page — everyone who opens it sees the same board.</footer>
 </div>
 
-<button class="fab ripple" id="addBtn" aria-label="Add application" title="Add application">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-</button>
+<!-- ---------- main app ---------- -->
+<div id="appScreen" hidden>
+  <header class="top">
+    <div class="brand">
+      <h1>Application Runway</h1>
+      <p>Every application, tracked in one place.</p>
+    </div>
+    <div class="userchip">
+      <img class="avatar" id="userAvatarImg" hidden alt="">
+      <div class="avatar" id="userAvatarFallback"></div>
+      <span class="email" id="userEmail"></span>
+      <button class="signout" id="signOutBtn">Sign out</button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="banner" id="banner"></div>
+
+    <div class="board" id="board"></div>
+
+    <div class="toolbar">
+      <div class="search">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="searchInput" type="text" placeholder="Search company or role">
+      </div>
+      <div class="chips" id="statusChips"></div>
+      <select class="sort" id="sortSelect">
+        <option value="date_desc">Newest first</option>
+        <option value="date_asc">Oldest first</option>
+        <option value="company">Company A–Z</option>
+        <option value="status">By status</option>
+      </select>
+    </div>
+
+    <div class="list" id="list"></div>
+
+    <footer>Signed in — your applications are saved to your account and synced across every device you log in on.</footer>
+  </div>
+
+  <button class="fab ripple" id="addBtn" aria-label="Add application" title="Add application">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>
+</div>
 
 <div class="overlay" id="overlay">
   <div class="modal">
@@ -439,8 +467,12 @@
 (function(){
   "use strict";
 
-  var DATA_PATH = "data/applications.json";
-  var LS_KEY = "application-runway/entries";
+  // ======== fill these in from your Supabase project settings ========
+  var SUPABASE_URL = "https://mhdswhqhkoefuvqemnzw.supabase.co";
+  var SUPABASE_ANON_KEY = "sb_publishable_xBEaojQ8_a2oVOGev1ha1A_qEJEDLOw";
+  // =====================================================================
+
+  var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   var STATUSES = [
     { key: "applied",    label: "Applied",     varc: "--status-applied" },
@@ -455,8 +487,7 @@
   }
 
   var entries = [];
-  var artifactNS = null;
-  var writable = true;
+  var currentUser = null;
   var editingId = null;
   var activeStatusFilter = "all";
   var searchTerm = "";
@@ -479,36 +510,6 @@
     setTimeout(function(){ span.remove(); }, 550);
   });
 
-  // ---------- persistence ----------
-  function uid(){
-    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-    return "id-" + Date.now() + "-" + Math.random().toString(16).slice(2);
-  }
-
-  function loadLocal(){
-    try{
-      var raw = localStorage.getItem(LS_KEY);
-      if (raw) return JSON.parse(raw);
-    }catch(e){}
-    return null;
-  }
-  function saveLocal(){
-    try{ localStorage.setItem(LS_KEY, JSON.stringify(entries)); }catch(e){}
-  }
-
-  function setSaveState(state, msg){
-    var dot = document.getElementById("saveDot");
-    var txt = document.getElementById("saveText");
-    dot.className = "save-dot" + (state === "busy" ? " busy" : state === "err" ? " err" : "");
-    txt.textContent = msg;
-  }
-
-  function showBanner(msg){
-    var b = document.getElementById("banner");
-    b.textContent = msg;
-    b.classList.add("show");
-  }
-
   function toast(msg){
     var t = document.getElementById("toast");
     t.textContent = msg;
@@ -516,87 +517,141 @@
     clearTimeout(toast._t);
     toast._t = setTimeout(function(){ t.classList.remove("show"); }, 1800);
   }
-
-  async function loadData(){
-    var fetched = false;
-    try{
-      var res = await fetch(DATA_PATH, { cache: "no-store" });
-      if (res.ok){
-        var json = await res.json();
-        if (Array.isArray(json)){ entries = json; fetched = true; }
-      }
-    }catch(e){}
-    if (!fetched){
-      var local = loadLocal();
-      entries = local && Array.isArray(local) ? local : [];
-    }
+  function showBanner(msg){
+    var b = document.getElementById("banner");
+    b.textContent = msg;
+    b.classList.add("show");
   }
 
-  async function initCapability(){
-    try{
-      if (window.claude && window.claude.use){
-        artifactNS = await window.claude.use("artifact");
-      }
-    }catch(e){ artifactNS = null; }
+  // ---------- auth ----------
+  function showAuthError(msg){
+    var el = document.getElementById("authErr");
+    el.textContent = msg;
+    el.classList.add("show");
   }
 
-  var persistBusy = false;
-  var retriedOnce = false;
-  async function persist(){
-    saveLocal();
-    if (!artifactNS || !writable){
-      setSaveState(artifactNS ? "err" : "idle", artifactNS ? "Read-only — saved to this browser" : "Saved to this browser");
-      return;
-    }
-    persistBusy = true;
-    setSaveState("busy", "Saving…");
-    try{
-      var files = {};
-      files[DATA_PATH] = JSON.stringify(entries, null, 2);
-      await artifactNS.publish(files);
-      retriedOnce = false;
-      setSaveState("ok", "Saved");
-    }catch(err){
-      await handlePublishError(err);
-    }finally{
-      persistBusy = false;
-    }
+  document.getElementById("googleBtn").addEventListener("click", async function(){
+    var { error } = await sb.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.href.split("#")[0] }
+    });
+    if (error) showAuthError(error.message);
+  });
+
+  document.getElementById("signOutBtn").addEventListener("click", async function(){
+    await sb.auth.signOut();
+    entries = [];
+    currentUser = null;
+    document.getElementById("appScreen").hidden = true;
+    document.getElementById("authScreen").hidden = false;
+  });
+
+  function initials(str){
+    if (!str) return "?";
+    return str.trim().slice(0,1).toUpperCase();
   }
 
-  async function handlePublishError(err){
-    var code = err && err.code;
-    if (code === "conflict"){
-      if (!retriedOnce){
-        retriedOnce = true;
-        setSaveState("busy", "Syncing…");
-        try{
-          var files = {};
-          files[DATA_PATH] = JSON.stringify(entries, null, 2);
-          await artifactNS.publish(files);
-          retriedOnce = false;
-          setSaveState("ok", "Saved");
-          return;
-        }catch(e2){
-          setSaveState("err", "Open in another tab?");
-          return;
-        }
-      }
-      setSaveState("err", "Open in another tab?");
-    } else if (code === "not_writer" || code === "not_granted"){
-      writable = false;
-      showBanner("This view can't save changes here, so edits are kept only in this browser.");
-      setSaveState("err", "Saved to this browser");
-    } else if (code === "not_declared" || code === "capability_disabled" || code === "capability_removed"){
-      artifactNS = null;
-      setSaveState("idle", "Saved to this browser");
-    } else if (code === "too_large"){
-      setSaveState("err", "Too much data to sync");
-      toast("Board is too large to save automatically.");
-    } else if (code === "rate_limited"){
-      setSaveState("err", "Saving too fast");
+  async function onSignedIn(session){
+    currentUser = session.user;
+    var meta = currentUser.user_metadata || {};
+    var name = meta.full_name || meta.name || currentUser.email || "";
+    document.getElementById("userEmail").textContent = currentUser.email || name;
+    var avatarImg = document.getElementById("userAvatarImg");
+    var avatarFallback = document.getElementById("userAvatarFallback");
+    if (meta.avatar_url){
+      avatarImg.src = meta.avatar_url;
+      avatarImg.hidden = false;
+      avatarFallback.hidden = true;
     } else {
-      setSaveState("err", "Couldn't save — retrying next change");
+      avatarFallback.textContent = initials(name || currentUser.email);
+      avatarFallback.hidden = false;
+      avatarImg.hidden = true;
     }
+    document.getElementById("authScreen").hidden = true;
+    document.getElementById("appScreen").hidden = false;
+    await fetchEntries();
+    renderAll();
+  }
+
+  sb.auth.onAuthStateChange(function(event, session){
+    if (session && session.user){
+      onSignedIn(session);
+    } else {
+      document.getElementById("appScreen").hidden = true;
+      document.getElementById("authScreen").hidden = false;
+    }
+  });
+
+  (async function bootAuth(){
+    var { data, error } = await sb.auth.getSession();
+    if (error){ showAuthError(error.message); return; }
+    if (data && data.session){
+      await onSignedIn(data.session);
+    }
+  })();
+
+  // ---------- data mapping ----------
+  function rowToEntry(row){
+    return {
+      id: row.id,
+      company: row.company,
+      role: row.role,
+      location: row.location || "",
+      link: row.link || "",
+      dateApplied: row.date_applied || "",
+      status: row.status,
+      nextStep: row.next_step || "",
+      followUpDate: row.follow_up_date || "",
+      notes: row.notes || ""
+    };
+  }
+  function entryToRow(e){
+    return {
+      company: e.company,
+      role: e.role,
+      location: e.location || null,
+      link: e.link || null,
+      date_applied: e.dateApplied,
+      status: e.status,
+      next_step: e.nextStep || null,
+      follow_up_date: e.followUpDate || null,
+      notes: e.notes || null
+    };
+  }
+
+  // ---------- persistence (Supabase) ----------
+  async function fetchEntries(){
+    var { data, error } = await sb.from("applications").select("*").order("date_applied", { ascending: false });
+    if (error){ console.error(error); toast("Could not load your applications"); entries = []; return; }
+    entries = data.map(rowToEntry);
+  }
+
+  async function addEntry(data){
+    var payload = entryToRow(data);
+    payload.user_id = currentUser.id;
+    var { data: inserted, error } = await sb.from("applications").insert(payload).select().single();
+    if (error){ console.error(error); toast("Could not save — try again"); return; }
+    entries.push(rowToEntry(inserted));
+    renderAll();
+  }
+  async function updateEntry(id, patch){
+    var idx = entries.findIndex(function(e){ return e.id === id; });
+    if (idx === -1) return;
+    var merged = Object.assign({}, entries[idx], patch);
+    var payload = entryToRow(merged);
+    var { data: updated, error } = await sb.from("applications").update(payload).eq("id", id).select().single();
+    if (error){ console.error(error); toast("Could not save — try again"); return; }
+    entries[idx] = rowToEntry(updated);
+    renderAll();
+  }
+  async function removeEntry(id){
+    var e = entries.find(function(e){ return e.id === id; });
+    if (!e) return;
+    if (!confirm('Delete the application to "'+e.company+'"?')) return;
+    var { error } = await sb.from("applications").delete().eq("id", id);
+    if (error){ console.error(error); toast("Could not delete — try again"); return; }
+    entries = entries.filter(function(x){ return x.id !== id; });
+    renderAll();
   }
 
   // ---------- computed ----------
@@ -736,29 +791,6 @@
     renderList();
   }
 
-  // ---------- mutations ----------
-  function addEntry(data){
-    data.id = uid();
-    entries.push(data);
-    renderAll();
-    persist();
-  }
-  function updateEntry(id, patch){
-    var idx = entries.findIndex(function(e){ return e.id === id; });
-    if (idx === -1) return;
-    entries[idx] = Object.assign({}, entries[idx], patch);
-    renderAll();
-    persist();
-  }
-  function removeEntry(id){
-    var e = entries.find(function(e){ return e.id === id; });
-    if (!e) return;
-    if (!confirm('Delete the application to "'+e.company+'"?')) return;
-    entries = entries.filter(function(x){ return x.id !== id; });
-    renderAll();
-    persist();
-  }
-
   // ---------- modal ----------
   var overlay = document.getElementById("overlay");
   var form = document.getElementById("entryForm");
@@ -801,10 +833,10 @@
   document.addEventListener("keydown", function(ev){ if (ev.key === "Escape" && overlay.classList.contains("show")) closeModal(); });
 
   document.getElementById("deleteBtn").addEventListener("click", function(){
-    if (editingId){ closeModal(); removeEntry(editingId); }
+    if (editingId){ var id = editingId; closeModal(); removeEntry(id); }
   });
 
-  form.addEventListener("submit", function(ev){
+  form.addEventListener("submit", async function(ev){
     ev.preventDefault();
     var data = {
       company: document.getElementById("f-company").value.trim(),
@@ -818,9 +850,15 @@
       notes: document.getElementById("f-notes").value.trim()
     };
     if (!data.company || !data.role || !data.dateApplied){ return; }
-    if (editingId){ updateEntry(editingId, data); toast("Updated"); }
-    else { addEntry(data); toast("Added"); }
-    closeModal();
+    var saveBtn = document.getElementById("saveBtn");
+    saveBtn.disabled = true;
+    try{
+      if (editingId){ await updateEntry(editingId, data); toast("Updated"); }
+      else { await addEntry(data); toast("Added"); }
+      closeModal();
+    } finally {
+      saveBtn.disabled = false;
+    }
   });
 
   // ---------- toolbar ----------
@@ -832,17 +870,7 @@
     sortMode = ev.target.value;
     renderList();
   });
-
-  // ---------- boot ----------
-  (async function init(){
-    await Promise.all([loadData(), initCapability()]);
-    if (!artifactNS){
-      setSaveState("idle", "Saved to this browser");
-      document.getElementById("footerNote").textContent = "Data is saved locally in this browser (not shared across devices).";
-    } else {
-      setSaveState("ok", "Synced");
-    }
-    renderAll();
-  })();
 })();
 </script>
+</body>
+</html>
